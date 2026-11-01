@@ -1,0 +1,7 @@
+[
+  { "id": "p1", "name": "Wireless Headphones", "price": 59.90, "tags": "audio music headphones" },
+  { "id": "p2", "name": "Mechanical Keyboard", "price": 89.00, "tags": "keyboard typing desk" },
+  { "id": "p3", "name": "USB-C Hub 7-in-1", "price": 34.50, "tags": "usb hub laptop adapter" },
+  { "id": "p4", "name": "Laptop Stand", "price": 27.00, "tags": "laptop stand desk ergonomic" },
+  { "id": "p5", "name": "4K Monitor 27in", "price": 329.00, "tags": "monitor screen display 4k" }
+]

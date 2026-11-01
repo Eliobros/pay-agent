@@ -1,0 +1,15 @@
+{
+  "name": "pay-agent",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "backend",
+  "frontend"
+  ],
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "ai": "uvicorn app:app --reload --host 0.0.0.0 --port 3004",
+    "backend": "node backend/server.js",
+    "frontend": "npm run dev --workspace=frontend"
+  }
+}

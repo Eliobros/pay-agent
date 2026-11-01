@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Desk Gear Co.</title>
+<style>
+  body { margin: 0; font-family: system-ui, sans-serif; background: #fafaf7; color: #1b1b1b; }
+  header { padding: 22px 6vw; font-weight: 800; font-size: 22px; border-bottom: 1px solid #e6e6df; }
+  .hero { padding: 48px 6vw 24px; max-width: 760px; }
+  .hero h1 { font-size: clamp(28px, 6vw, 46px); margin: 0 0 10px; }
+  .hero p { color: #5a5a52; font-size: 18px; margin: 0; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 16px; padding: 24px 6vw 80px; }
+  .card { background: #fff; border: 1px solid #e6e6df; border-radius: 16px; padding: 22px; }
+  .card span { font-size: 40px; display: block; margin-bottom: 10px; }
+  .card b { display: block; }
+  .card small { color: #5a5a52; }
+</style>
+</head>
+<body>
+<header>Desk Gear Co.</header>
+<section class="hero">
+  <h1>Everything for a better desk</h1>
+  <p>This is a sample store. The chat bubble in the corner is the PayAgent widget, added with one script tag.</p>
+</section>
+<section class="grid">
+  <div class="card"><span>🎧</span><b>Wireless Headphones</b><small>Focus mode on</small></div>
+  <div class="card"><span>⌨️</span><b>Mechanical Keyboard</b><small>Typing, but better</small></div>
+  <div class="card"><span>🖥️</span><b>4K Monitor 27in</b><small>See every pixel</small></div>
+</section>
+<script src="/widget.js" defer></script>
+</body>
+</html>
