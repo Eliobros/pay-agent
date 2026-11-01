@@ -23,6 +23,27 @@ const HINTS = [
   'What monitors do you have?',
 ];
 
+const REFUND_LABEL = {
+  REQUESTED: 'Request sent',
+  WAITING_EVIDENCE: 'Waiting for your photos',
+  UNDER_REVIEW: 'The store owner is reviewing your evidence',
+  MORE_EVIDENCE_REQUIRED: 'More evidence needed',
+  APPROVED: 'Approved',
+  PROCESSING: 'Refund in progress',
+  REFUNDED: 'Refunded',
+  REJECTED: 'Rejected',
+  FAILED: 'The refund failed',
+};
+
+const CLOSED_REFUNDS = ['REFUNDED', 'REJECTED', 'FAILED'];
+
+// Sent with every message so a retried request reuses the same PayPal checkout
+// instead of creating a second one.
+const newRequestId = () =>
+  typeof crypto !== 'undefined' && crypto.randomUUID
+    ? crypto.randomUUID()
+    : Date.now().toString(36) + Math.random().toString(36).slice(2);
+
 export default function Home() {
   const [messages, setMessages] = useState([
     { role: 'assistant', content: "Hi, I'm PayAgent. Tell me what you need and I'll find it and set up the payment." },
@@ -32,6 +53,9 @@ export default function Home() {
   const [checkout, setCheckout] = useState(null);
   const [products, setProducts] = useState([]);
   const [pending, setPending] = useState(null);
+  const [refund, setRefund] = useState(null);
+  const [uploading, setUploading] = useState(false);
+  const [refundError, setRefundError] = useState('');
   const [visitor, setVisitor] = useState('');
   const endRef = useRef(null);
 
@@ -76,6 +100,23 @@ export default function Home() {
     return () => clearInterval(t);
   }, [pending]);
 
+  // The store owner reviews the evidence outside the chat, so the request
+  // status is polled here instead of being decided by the assistant.
+  useEffect(() => {
+    if (!refund?.request_id || !visitor) return;
+    const t = setInterval(async () => {
+      try {
+        const res = await fetch(
+          `${API}/refunds/${refund.request_id}?user_id=${encodeURIComponent(visitor)}`,
+        );
+        if (!res.ok) return;
+        const d = await res.json();
+        setRefund((prev) => (prev ? { ...prev, status: d.status, amount_usd: d.amount_usd } : prev));
+      } catch {}
+    }, 5000);
+    return () => clearInterval(t);
+  }, [refund?.request_id, visitor]);
+
   const send = async (text) => {
     const msg = text.trim();
     if (!msg || loading) return;
@@ -87,7 +128,7 @@ export default function Home() {
       const res = await fetch(`${API}/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: msg, user_id: visitor || 'guest' }),
+        body: JSON.stringify({ message: msg, user_id: visitor || 'guest', request_id: newRequestId() }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail || 'Request failed');
@@ -96,6 +137,7 @@ export default function Home() {
         setCheckout(data.checkout);
       }
       if (data.approval) setPending(data.approval);
+      if (data.refund) setRefund({ ...data.refund, uploaded: 0 });
     } catch (err) {
       console.error(err);
       setMessages((p) => [
@@ -104,6 +146,31 @@ export default function Home() {
       ]);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const uploadEvidence = async (file) => {
+    if (!refund?.request_id || !file) return;
+    setUploading(true);
+    setRefundError('');
+    const form = new FormData();
+    form.append('file', file);
+    try {
+      const res = await fetch(
+        `${API}/refunds/${refund.request_id}/evidence?user_id=${encodeURIComponent(visitor)}`,
+        { method: 'POST', body: form },
+      );
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.detail || 'Could not upload this file');
+      setRefund((prev) => ({
+        ...prev,
+        status: data.status,
+        uploaded: (prev?.uploaded || 0) + 1,
+      }));
+    } catch (err) {
+      setRefundError(err.message);
+    } finally {
+      setUploading(false);
     }
   };
 
@@ -136,6 +203,36 @@ export default function Home() {
             {pending && (
               <div className="wait">
                 Waiting for the store owner to approve ${pending.total_usd.toFixed(2)}. This page updates by itself.
+              </div>
+            )}
+            {refund && (
+              <div className="evidence">
+                <div className="row2" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
+                  <b>Refund request · ${Number(refund.amount_usd || 0).toFixed(2)}</b>
+                  <span className={`chip ${refund.status === 'REFUNDED' ? 'ok' : CLOSED_REFUNDS.includes(refund.status) ? 'bad' : 'wait'}`}>
+                    {REFUND_LABEL[refund.status] || refund.status}
+                  </span>
+                </div>
+                {!CLOSED_REFUNDS.includes(refund.status) && (
+                  <>
+                    <p className="note">
+                      Attach photos or a short video (up to 15 MB, 60 seconds) of the problem.
+                      The store owner reviews them.
+                    </p>
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp,video/mp4,video/webm"
+                      disabled={uploading}
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) uploadEvidence(file);
+                        e.target.value = '';
+                      }}
+                    />
+                  </>
+                )}
+                {refund.uploaded > 0 && <p className="note">{refund.uploaded} file(s) sent.</p>}
+                {refundError && <p className="note" style={{ color: '#a12020' }}>{refundError}</p>}
               </div>
             )}
             {checkout && (

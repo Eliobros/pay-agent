@@ -3,3 +3,6 @@ uvicorn
 httpx
 openai
 python-dotenv
+python-multipart
+argon2-cffi
+cryptography
