@@ -178,7 +178,7 @@ export default function Home() {
     <main className="shell">
       <header className="top">
         <div className="brand">
-          <div className="mark">🛍️</div>
+          <img className="mark" src="/logo.png" alt="PayAgent" />
           <div>
             <h1>PayAgent</h1>
             <p>Shop by talking. Pay with PayPal.</p>

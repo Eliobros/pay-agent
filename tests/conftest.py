@@ -20,6 +20,9 @@ os.environ["ALLOW_OWNER_REGISTRATION"] = "true"
 os.environ["LOGIN_RATE_LIMIT_PER_MIN"] = "5"
 os.environ["RATE_LIMIT_PER_MIN"] = "20"
 os.environ["SESSION_COOKIE_SECURE"] = "false"
+# A developer's .env must not change which origin the API accepts.
+os.environ["FRONTEND_ORIGIN"] = "http://localhost:3000"
+os.environ.pop("FRONTEND_ORIGINS", None)
 os.environ["MAX_ORDER_USD"] = "200"
 os.environ["MAX_AUTO_REFUND_USD"] = "100"
 # Never inherit a developer's .env PayPal keys: tests assert the fallback chain.

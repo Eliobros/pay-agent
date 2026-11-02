@@ -41,7 +41,16 @@ PAYPAL_BASE = os.getenv("PAYPAL_BASE_URL", "https://api-m.sandbox.paypal.com")
 PAYPAL_WEBHOOK_ID = os.getenv("PAYPAL_WEBHOOK_ID") or ""
 
 # ---------------------------------------------------------------- app
+# Frontend address, used for the PayPal return/cancel URLs and as the first
+# allowed origin. CORS needs a list, so a second (or third) frontend can be
+# added with FRONTEND_ORIGINS: a single string silently blocks every other
+# origin, and the browser reports it as a failed request, not as a 403.
 FRONTEND_ORIGIN = os.getenv("FRONTEND_ORIGIN", "http://localhost:3000")
+FRONTEND_ORIGINS = [
+    value.strip().rstrip("/")
+    for value in (os.getenv("FRONTEND_ORIGINS") or FRONTEND_ORIGIN).split(",")
+    if value.strip()
+]
 STORE_NAME = os.getenv("STORE_NAME", "Demo Store")
 DEFAULT_STORE_ID = os.getenv("DEFAULT_STORE_ID", "store_demo")
 PRODUCTS_FILE = os.getenv("PRODUCTS_FILE", "products.json")  # the merchant edits this file
@@ -65,7 +74,22 @@ EVIDENCE_STORAGE = os.getenv("EVIDENCE_STORAGE", "local").strip().lower()
 SESSION_TTL_HOURS = _int("SESSION_TTL_HOURS", 12)
 SESSION_COOKIE_NAME = os.getenv("SESSION_COOKIE_NAME", "payagent_session")
 SESSION_COOKIE_SECURE = _bool("SESSION_COOKIE_SECURE", FRONTEND_ORIGIN.startswith("https"))
-SESSION_COOKIE_SAMESITE = os.getenv("SESSION_COOKIE_SAMESITE", "lax")
+# A cookie that has to reach a *different* site (dashboard on Vercel, API on a
+# VPS) must be `none`: with `lax` the browser keeps it but never sends it on a
+# fetch, so the owner is logged out on every request without any error. On a
+# single origin `lax` is the safer default and is kept when the frontend is not
+# HTTPS (a `none` cookie without Secure is rejected by every browser).
+SESSION_COOKIE_SAMESITE = (os.getenv("SESSION_COOKIE_SAMESITE") or "").strip().lower()
+if not SESSION_COOKIE_SAMESITE:
+    SESSION_COOKIE_SAMESITE = "none" if SESSION_COOKIE_SECURE else "lax"
+if SESSION_COOKIE_SAMESITE not in ("lax", "strict", "none"):
+    raise RuntimeError(
+        "SESSION_COOKIE_SAMESITE must be one of: lax, strict, none "
+        f"(got {SESSION_COOKIE_SAMESITE!r})"
+    )
+if SESSION_COOKIE_SAMESITE == "none":
+    # Browsers reject SameSite=None without Secure.
+    SESSION_COOKIE_SECURE = True
 # The very first owner account is always allowed (first-run setup). After that,
 # registration stays closed unless the operator opens it.
 ALLOW_OWNER_REGISTRATION = _bool("ALLOW_OWNER_REGISTRATION", False)

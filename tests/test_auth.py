@@ -133,3 +133,34 @@ def test_owner_cannot_touch_another_stores_data(client, owner_client):
 def test_duplicate_email_is_rejected(client, owner_client):
     response = register(client, email="owner@example.com")
     assert response.status_code == 409
+
+
+def test_session_cookie_follows_the_configured_scope(client):
+    # Over plain HTTP the cookie stays `lax`; over HTTPS it becomes `none`,
+    # which is what a dashboard on another domain needs to be sent at all.
+    cookie = register(client).headers["set-cookie"].lower()
+    assert "samesite=lax" in cookie
+    assert "; secure" not in cookie
+
+    from payagent import config
+
+    assert config.SESSION_COOKIE_SAMESITE in ("lax", "strict", "none")
+    if config.SESSION_COOKIE_SAMESITE == "none":
+        assert config.SESSION_COOKIE_SECURE
+
+
+def test_requests_from_another_origin_are_refused(client):
+    # A foreign page must not reach the API even with a valid cookie: CORS
+    # only stops the browser from reading the answer, this stops the request.
+    response = client.get("/health", headers={"Origin": "https://evil.example"})
+    assert response.status_code == 403
+
+    allowed = client.get("/health", headers={"Origin": "http://localhost:3000"})
+    assert allowed.status_code == 200
+    assert allowed.headers.get("access-control-allow-origin") == "http://localhost:3000"
+
+
+def test_server_to_server_calls_have_no_origin(client):
+    # PayPal webhooks, curl and same-origin navigation send no Origin header.
+    assert client.get("/health").status_code == 200
+    assert client.get("/health", headers={"Origin": "null"}).status_code == 403

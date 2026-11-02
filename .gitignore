@@ -17,3 +17,4 @@ frontend/.env.local
 
 # local data
 *.db
+.vercel

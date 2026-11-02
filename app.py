@@ -11,6 +11,7 @@ import re
 import httpx
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import PlainTextResponse
 from openai import OpenAI
 from pydantic import BaseModel
 
@@ -27,10 +28,45 @@ from payagent.webhooks import router as webhooks_router
 
 client = OpenAI(base_url=config.MODEL_BASE_URL, api_key=config.MODEL_API_KEY or "missing_key")
 
+class RejectForeignOrigin:
+    """Refuse a request whose `Origin` is not on the configured list.
+
+    CORS only tells the *browser* what to do with the response; it does not
+    stop the request from being processed. A page that is not the dashboard
+    must not be able to reach an endpoint while carrying the owner session,
+    so an unknown origin is rejected here, before the body is read.
+    """
+
+    def __init__(self, app, allowed):
+        self.app = app
+        self.allowed = {origin.lower() for origin in allowed}
+
+    async def __call__(self, scope, receive, send):
+        if scope.get("type") != "http":
+            return await self.app(scope, receive, send)
+        origin = ""
+        for key, value in scope.get("headers", []):
+            if key.lower() == b"origin":
+                origin = value.decode("latin-1", "ignore").strip().lower()
+                break
+        # No Origin means a navigation, curl or a server-to-server call
+        # (PayPal webhooks): those are not cross-origin abuse.
+        if origin and origin not in self.allowed:
+            response = PlainTextResponse("Origin not allowed", status_code=403)
+            await response(scope, receive, send)
+            return
+        await self.app(scope, receive, send)
+
+
 app = FastAPI(title="PayAgent")
+# Innermost first: CORS runs on the way out so an allowed origin still gets
+# its headers, and an unknown origin is refused before it reaches a handler.
+app.add_middleware(RejectForeignOrigin, allowed=config.FRONTEND_ORIGINS)
+# Credentials (the owner session cookie) can only travel to an origin listed
+# here, so the list comes from the configuration instead of a wildcard.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[config.FRONTEND_ORIGIN],
+    allow_origins=config.FRONTEND_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

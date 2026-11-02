@@ -1,6 +1,10 @@
 export const metadata = {
   title: 'PayAgent - AI shopping assistant with PayPal',
   description: 'An open-source AI sales agent with PayPal checkout, refunds and human approval.',
+  icons: {
+    icon: '/icon.png',
+    apple: '/icon.png',
+  },
 };
 
 export const viewport = {

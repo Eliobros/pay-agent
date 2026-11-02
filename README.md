@@ -155,10 +155,45 @@ Open http://localhost:3000.
 3. Paste this in your site:
 
 ```html
-<script src="https://YOUR-HOST/widget.js" defer></script>
+<script src="https://YOUR-FRONTEND-HOST/widget.js" defer></script>
 ```
 
-Optional: `data-color="#e11d48"` changes the bubble color. Serve the app over HTTPS when your store uses HTTPS.
+`YOUR-FRONTEND-HOST` is the address that serves `/embed` (the Next.js app), not the API:
+the widget derives the chat frame from where the script itself is loaded. Optional:
+`data-color="#e11d48"` changes the bubble color. Serve the app over HTTPS when your
+store uses HTTPS.
+
+## Deploying (Vercel + your own server)
+
+The backend runs on your server (systemd + nginx, see `deploy/`) and the Next.js app
+on Vercel. Three values have to agree, and they are the ones that break silently when
+they do not:
+
+```bash
+# on the server, in .env
+FRONTEND_ORIGIN=https://your-app.vercel.app   # PayPal returns the buyer here
+FRONTEND_ORIGINS=https://your-app.vercel.app  # origins allowed to send cookies
+# SESSION_COOKIE_SAMESITE can stay empty: over HTTPS it becomes `none`, which
+# is what a dashboard on another domain needs (with `lax` the browser keeps the
+# cookie but never sends it, and the owner looks logged out on every request).
+```
+
+```bash
+# on Vercel, environment variables
+NEXT_PUBLIC_API_URL=https://your-api.example.com
+```
+
+And two addresses outside the code:
+
+- **PayPal webhook**: `https://your-api.example.com/webhooks/paypal` in the app's
+  Webhooks page (plus `PAYPAL_WEBHOOK_ID`), otherwise payments are only confirmed by
+  the browser redirect.
+- **Widget on your store**: `https://your-app.vercel.app/widget.js`.
+
+Checklist when something does not work: the API answers `curl https://your-api.example.com/health`,
+the dashboard keeps the session after a reload (that is the `SameSite` value), and
+`FRONTEND_ORIGINS` contains the exact origin the browser shows in the address bar
+(no trailing slash, scheme included).
 
 ## Configuration
 
@@ -171,8 +206,10 @@ Optional: `data-color="#e11d48"` changes the bubble color. Serve the app over HT
 | `CONVERSATION_TTL_HOURS` | Inactivity after which a chat starts fresh | 24 |
 | `STORE_NAME` | Name shown in the chat and the agent prompt | Demo Store |
 | `DEFAULT_STORE_ID` | Id of the demo store created on first boot | store_demo |
+| `FRONTEND_ORIGINS` | Origins allowed to call the API with credentials | `FRONTEND_ORIGIN` |
 | `SESSION_TTL_HOURS` | How long an owner session stays valid | 12 |
-| `SESSION_COOKIE_SECURE` | Send the session cookie over HTTPS only | false |
+| `SESSION_COOKIE_SECURE` | Send the session cookie over HTTPS only | true on HTTPS |
+| `SESSION_COOKIE_SAMESITE` | Cookie scope; `none` is required across sites | derived |
 | `ALLOW_OWNER_REGISTRATION` | Allow more owner accounts after the first one | false |
 | `OWNER_SIGNUP_CODE` | Optional shared code required to register | — |
 | `LOGIN_RATE_LIMIT_PER_MIN` | Login attempts per minute | 8 |

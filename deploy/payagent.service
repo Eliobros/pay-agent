@@ -1,0 +1,15 @@
+[Unit]
+Description=PayAgent backend (FastAPI)
+After=network.target
+
+[Service]
+User=vpcuser
+Group=vpcuser
+WorkingDirectory=/home/vpcuser/pay-agent
+Environment=PATH=/home/vpcuser/pay-agent/.venv/bin
+ExecStart=/home/vpcuser/pay-agent/.venv/bin/uvicorn app:app --host 127.0.0.1 --port 3004
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
