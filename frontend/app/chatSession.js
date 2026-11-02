@@ -7,7 +7,7 @@ export const PENDING_ORDER_KEY = 'payagent_pending_order';
 export const GREETING = "Hi, I'm PayAgent. Tell me what you need and I'll find it and set up the payment.";
 
 export const PAID_MESSAGE =
-  '✨ Seu pagamento foi confirmado com sucesso via PayPal! O pedido já está sendo processado. Como posso te ajudar agora?';
+    '✨ Your payment was successfully confirmed via PayPal! Your order is now being processed. How can I help you next?';
 
 export const loadChatSession = () => {
   try {
