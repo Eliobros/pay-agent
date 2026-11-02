@@ -390,6 +390,28 @@ def capture(order_id: str):
         raise HTTPException(502, "PayPal capture failed")
 
 
+@app.get("/paypal/orders/{order_id}")
+def order_status(order_id: str):
+    """Public status check used by the chat page while the buyer pays.
+
+    Read-only and free of side effects: it never moves money, so the frontend
+    can poll it as often as it needs while waiting for the payment.
+    """
+    order = orders_store.get(order_id)
+    if not order:
+        raise HTTPException(404, "unknown order")
+    if order["status"] in ("COMPLETED", "REFUNDED"):
+        # Already settled locally by a capture or a verified webhook.
+        return {"order_id": order["id"], "status": order["status"]}
+    try:
+        data = paypal.get_order(order["store_id"], order_id)
+    except paypal.NotConfigured as e:
+        raise HTTPException(503, str(e))
+    except httpx.HTTPStatusError:
+        raise HTTPException(502, "PayPal status lookup failed")
+    return {"order_id": order_id, "status": data.get("status", "UNKNOWN")}
+
+
 # ---------------------------------------------------------------- human approval
 @app.get("/approvals/{approval_id}")
 def approval_status(approval_id: str):

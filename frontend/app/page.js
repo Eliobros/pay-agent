@@ -2,6 +2,14 @@
 
 import { useEffect, useRef, useState } from 'react';
 import './store.css';
+import {
+  GREETING,
+  PAID_MESSAGE,
+  loadChatSession,
+  loadPendingOrder,
+  saveChatSession,
+  savePendingOrder,
+} from './chatSession';
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
@@ -37,6 +45,10 @@ const REFUND_LABEL = {
 
 const CLOSED_REFUNDS = ['REFUNDED', 'REJECTED', 'FAILED'];
 
+// How long the page keeps asking the backend about a payment in flight.
+const POLL_INTERVAL_MS = 2500;
+const POLL_MAX_ATTEMPTS = 12;
+
 // Sent with every message so a retried request reuses the same PayPal checkout
 // instead of creating a second one.
 const newRequestId = () =>
@@ -45,9 +57,7 @@ const newRequestId = () =>
     : Date.now().toString(36) + Math.random().toString(36).slice(2);
 
 export default function Home() {
-  const [messages, setMessages] = useState([
-    { role: 'assistant', content: "Hi, I'm PayAgent. Tell me what you need and I'll find it and set up the payment." },
-  ]);
+  const [messages, setMessages] = useState([{ role: 'assistant', content: GREETING }]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [checkout, setCheckout] = useState(null);
@@ -69,6 +79,22 @@ export default function Home() {
       try { localStorage.setItem('payagent_visitor', id); } catch {}
     }
     setVisitor(id);
+  }, []);
+
+  // Restores the conversation saved before the PayPal redirect and, if an
+  // order is still waiting, asks the backend whether the buyer has paid.
+  useEffect(() => {
+    const saved = loadChatSession();
+    if (saved) setMessages(saved);
+
+    const orderId = loadPendingOrder();
+    if (!orderId) return undefined;
+    // /success already confirmed it and wrote the message into the session.
+    if (saved?.some((m) => m.content === PAID_MESSAGE)) {
+      savePendingOrder(null);
+      return undefined;
+    }
+    return watchPayment(orderId);
   }, []);
 
   useEffect(() => {
@@ -147,6 +173,69 @@ export default function Home() {
     } finally {
       setLoading(false);
     }
+  };
+
+  // The buyer is leaving for PayPal: keep the conversation and remember
+  // which order to check when they come back.
+  const payWithPayPal = () => {
+    if (!checkout?.approval_url) return;
+    saveChatSession(messages);
+    savePendingOrder(checkout.order_id);
+    window.location.href = checkout.approval_url;
+  };
+
+  const announcePayment = () => {
+    setMessages((prev) => {
+      if (prev[prev.length - 1]?.content === PAID_MESSAGE) return prev;
+      const next = [...prev, { role: 'assistant', content: PAID_MESSAGE }];
+      saveChatSession(next);
+      return next;
+    });
+    savePendingOrder(null);
+  };
+
+  // Waits for the payment the buyer went to make. The backend is the source
+  // of truth: a verified webhook or the /success capture marks the order
+  // COMPLETED, and an approved order that was never captured is captured here.
+  const watchPayment = (orderId) => {
+    let stopped = false;
+    let attempts = 0;
+
+    const check = async () => {
+      if (stopped) return;
+      attempts += 1;
+      try {
+        const res = await fetch(`${API}/paypal/orders/${encodeURIComponent(orderId)}`);
+        if (res.status === 404) {
+          savePendingOrder(null);
+          return;
+        }
+        const data = await res.json();
+        let status = data.status;
+        if (status === 'APPROVED') {
+          // The buyer approved but the redirect never finished: capture now.
+          const capture = await fetch(`${API}/paypal/capture/${encodeURIComponent(orderId)}`, {
+            method: 'POST',
+          });
+          const captured = await capture.json().catch(() => ({}));
+          if (capture.ok) status = captured.status;
+        }
+        if (status === 'COMPLETED') {
+          announcePayment();
+          return;
+        }
+      } catch {}
+      if (stopped) return;
+      if (attempts >= POLL_MAX_ATTEMPTS) {
+        // Nothing to wait for: stop until a new checkout starts a new wait.
+        savePendingOrder(null);
+        return;
+      }
+      setTimeout(check, POLL_INTERVAL_MS);
+    };
+
+    check();
+    return () => { stopped = true; };
   };
 
   const uploadEvidence = async (file) => {
@@ -241,7 +330,13 @@ export default function Home() {
                   <b>${checkout.total_usd.toFixed(2)} USD</b>
                   <span>Your order is ready to pay</span>
                 </div>
-                <a className="paybtn" href={checkout.approval_url}>Pay with PayPal</a>
+                <a
+                  className="paybtn"
+                  href={checkout.approval_url}
+                  onClick={(e) => { e.preventDefault(); payWithPayPal(); }}
+                >
+                  Pay with PayPal
+                </a>
               </div>
             )}
             <div ref={endRef} />

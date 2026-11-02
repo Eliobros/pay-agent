@@ -123,6 +123,40 @@ def test_capture_does_not_call_paypal_for_an_already_paid_order(client, monkeypa
     assert calls == []
 
 
+# ---------------------------------------------------------------- status
+def test_order_status_of_unknown_order_is_404(client):
+    assert client.get("/paypal/orders/does-not-exist").status_code == 404
+
+
+def test_order_status_of_a_settled_order_skips_paypal(client, monkeypatch):
+    def boom(*args):
+        raise AssertionError("a settled order must not call PayPal")
+
+    monkeypatch.setattr(paypal, "get_order", boom)
+    order = make_order(status="COMPLETED", capture_id="CAP-1")
+
+    response = client.get(f"/paypal/orders/{order['id']}")
+
+    assert response.status_code == 200
+    assert response.json() == {"order_id": order["id"], "status": "COMPLETED"}
+
+
+def test_order_status_reports_the_paypal_state(client, monkeypatch):
+    seen = []
+    monkeypatch.setattr(
+        paypal,
+        "get_order",
+        lambda store_id, order_id: seen.append((store_id, order_id)) or {"status": "APPROVED"},
+    )
+    order = make_order()
+
+    response = client.get(f"/paypal/orders/{order['id']}")
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "APPROVED"
+    assert seen == [("store_demo", order["id"])]
+
+
 # ---------------------------------------------------------------- refunds
 def test_refund_sends_the_remaining_amount_once(database, fake_creds, monkeypatch):
     amounts = []
