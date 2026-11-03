@@ -241,8 +241,12 @@ Tests use a temporary SQLite file and never call PayPal or the model API.
 - Every order, approval and conversation row carries a `store_id`, and the API filters by the store of the signed-in owner.
 
 ## Roadmap
+* **SaaS Multi-Tenant Platform:** Transform PayAgent into a subscription-based platform where multiple store owners can register accounts, manage independent catalogs, and configure custom system prompts.
+* **CDN Script Injection:** Provide a drop-in `<script>` tag pointing to our global CDN, uniquely identified by a secure store token (`?id=store_uuid&token=jwt_hash`), enabling plug-and-play installation on any custom website.
+* **AI Quota Management:** Implement a tiered monetization model based on monthly consumption thresholds and message usage limits rather than lifetime access.
+* **Local Mobile Money (Moçambique):** Expand the existing payment provider registry to natively support local gateways like M-Pesa (Vodacom) and e-Mola (Movitel), allowing customers in African markets to buy via USSD/STK push notifications during chat sessions.
+* **E-commerce Integrations:** Build native webhooks and sync connectors for popular platforms like Shopify, WooCommerce, and Wix.
 
-Shopify and WooCommerce connectors, sales summaries for the owner with the Transaction Search API, and more payment providers (M-Pesa, e-Mola) behind the existing provider registry.
 
 ## What was built during the hackathon
 
