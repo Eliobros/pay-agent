@@ -396,6 +396,13 @@ export default function Owner() {
             ? 'The first account becomes the owner of this store.'
             : 'Sign in to approve purchases and refunds.'}
         </p>
+
+	{mode === 'login' && (
+          <p className="hint" style={{ color: '#1746d1', fontWeight: '600', marginBottom: 15 }}>
+            💡 Type this password "demo" to get in Admin Panel
+          </p>
+        )}
+
         <form onSubmit={submit}>
           <div className="tokenrow">
             <input
