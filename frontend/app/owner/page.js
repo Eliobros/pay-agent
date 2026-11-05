@@ -398,8 +398,6 @@ export default function Owner() {
             ? 'The first account becomes the owner of this store.'
             : 'Sign in to approve purchases and refunds.'}
         </p>
-
-	</p>
         {mode === 'login' && (
           <p style={{ color: '#1746d1', fontWeight: '600', fontSize: '14px', margin: '12px 0 24px', padding: '0 4px', textAlign: 'left', lineHeight: '1.5' }}>
             💡 <b>For testing and review:</b><br/>
