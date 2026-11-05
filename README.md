@@ -133,7 +133,11 @@ uvicorn app:app --reload --port 3004
 cd frontend && npm run dev
 ```
 
-Open http://localhost:3000.
+Open http://localhost:3000. The pages never call the API host directly: they request
+`/api/backend/...` on their own origin and the Next.js server proxies that to
+`NEXT_PUBLIC_API_URL` (or `API_ORIGIN`, which wins when both are set). Keeping the
+browser on one origin means the owner session cookie is first-party, so it is stored
+and sent back normally.
 
 ### PayPal Sandbox setup
 
@@ -166,22 +170,32 @@ store uses HTTPS.
 ## Deploying (Vercel + your own server)
 
 The backend runs on your server (systemd + nginx, see `deploy/`) and the Next.js app
-on Vercel. Three values have to agree, and they are the ones that break silently when
-they do not:
+on Vercel. The browser never calls the API host directly: every request goes to
+`/api/backend/...` on the app's own origin, and the Next.js server proxies it to the
+API. That keeps the owner session cookie first-party — a cookie set by a *different*
+site is dropped by the browser, and the owner is sent back to the login screen right
+after signing in. Four values have to agree, and they are the ones that break
+silently when they do not:
 
 ```bash
 # on the server, in .env
 FRONTEND_ORIGIN=https://your-app.vercel.app   # PayPal returns the buyer here
 FRONTEND_ORIGINS=https://your-app.vercel.app  # origins allowed to send cookies
-# SESSION_COOKIE_SAMESITE can stay empty: over HTTPS it becomes `none`, which
-# is what a dashboard on another domain needs (with `lax` the browser keeps the
-# cookie but never sends it, and the owner looks logged out on every request).
+# SESSION_COOKIE_SAMESITE can stay empty (over HTTPS it becomes `none`). Through
+# the /api/backend proxy the cookie belongs to the app's own origin, so `lax` is
+# also fine — and stricter — if you prefer to set it.
 ```
 
 ```bash
-# on Vercel, environment variables
+# on Vercel, build-time environment variables
+# Destination of the /api/backend proxy. API_ORIGIN wins when both are set.
 NEXT_PUBLIC_API_URL=https://your-api.example.com
+# API_ORIGIN=https://your-api.example.com
 ```
+
+These are read when the app is built (see `frontend/next.config.js`): after changing
+them you must redeploy, otherwise `/api/backend` keeps pointing at the old API — or
+at `http://localhost:8000` when neither is set.
 
 And two addresses outside the code:
 
@@ -190,10 +204,17 @@ And two addresses outside the code:
   the browser redirect.
 - **Widget on your store**: `https://your-app.vercel.app/widget.js`.
 
-Checklist when something does not work: the API answers `curl https://your-api.example.com/health`,
-the dashboard keeps the session after a reload (that is the `SameSite` value), and
-`FRONTEND_ORIGINS` contains the exact origin the browser shows in the address bar
-(no trailing slash, scheme included).
+Checklist when something does not work:
+
+- The API answers `curl https://your-api.example.com/health`.
+- The proxy answers too: `curl https://your-app.vercel.app/api/backend/health`. An
+  error here means the build-time variable above is missing or the app was not
+  redeployed after it changed.
+- The dashboard keeps the session after a reload. If it bounces to the login screen,
+  check the browser's network tab: requests must go to `/api/backend/...` on the
+  app's origin, not to the API host.
+- `FRONTEND_ORIGINS` contains the exact origin the browser shows in the address bar
+  (no trailing slash, scheme included) for any call that reaches the API directly.
 
 ## Configuration
 
@@ -207,9 +228,11 @@ the dashboard keeps the session after a reload (that is the `SameSite` value), a
 | `STORE_NAME` | Name shown in the chat and the agent prompt | Demo Store |
 | `DEFAULT_STORE_ID` | Id of the demo store created on first boot | store_demo |
 | `FRONTEND_ORIGINS` | Origins allowed to call the API with credentials | `FRONTEND_ORIGIN` |
+| `API_ORIGIN` | API address the Next.js server proxies `/api/backend` to (read at build time) | `NEXT_PUBLIC_API_URL` |
+| `NEXT_PUBLIC_API_URL` | API address proxied by `/api/backend` when `API_ORIGIN` is unset | `http://localhost:8000` |
 | `SESSION_TTL_HOURS` | How long an owner session stays valid | 12 |
 | `SESSION_COOKIE_SECURE` | Send the session cookie over HTTPS only | true on HTTPS |
-| `SESSION_COOKIE_SAMESITE` | Cookie scope; `none` is required across sites | derived |
+| `SESSION_COOKIE_SAMESITE` | Cookie scope; the `/api/backend` proxy makes it first-party, so `none` is only needed for direct cross-site calls | derived |
 | `ALLOW_OWNER_REGISTRATION` | Allow more owner accounts after the first one | false |
 | `OWNER_SIGNUP_CODE` | Optional shared code required to register | — |
 | `LOGIN_RATE_LIMIT_PER_MIN` | Login attempts per minute | 8 |

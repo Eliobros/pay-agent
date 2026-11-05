@@ -11,7 +11,7 @@ import {
   savePendingOrder,
 } from './chatSession';
 
-const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+const API = '/api/backend';
 
 const ICONS = [
   ['headphone', '🎧', '#ffe3ec'],

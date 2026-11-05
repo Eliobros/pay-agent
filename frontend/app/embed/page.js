@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import '../store.css';
 
-const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+const API = '/api/backend';
 
 const REFUND_LABEL = {
   REQUESTED: 'Request sent',

@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 
 import { GREETING, PAID_MESSAGE, loadChatSession, saveChatSession } from '../chatSession';
 
-const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+const API = '/api/backend';
 
 const readSession = () => loadChatSession() || [{ role: 'assistant', content: GREETING }];
 

@@ -3,7 +3,9 @@
 import { useCallback, useEffect, useState } from 'react';
 import '../store.css';
 
-const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+// Same-origin path proxied to the API by next.config.js, so the session
+// cookie belongs to this site and the browser always sends it back.
+const API = '/api/backend';
 
 // The session lives in an HTTP-only cookie, so every request must be sent
 // with credentials and no token is ever kept in the browser.
@@ -397,9 +399,12 @@ export default function Owner() {
             : 'Sign in to approve purchases and refunds.'}
         </p>
 
-	{mode === 'login' && (
-          <p className="hint" style={{ color: '#1746d1', fontWeight: '600', marginBottom: 15 }}>
-            💡 Type this password "demo" to get in Admin Panel
+	</p>
+        {mode === 'login' && (
+          <p style={{ color: '#1746d1', fontWeight: '600', fontSize: '14px', margin: '12px 0 24px', padding: '0 4px', textAlign: 'left', lineHeight: '1.5' }}>
+            💡 <b>For testing and review:</b><br/>
+            📧 <b>Email:</b>example@payagent.com<br/>
+            🔑 <b>Password:</b> demo
           </p>
         )}
 

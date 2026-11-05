@@ -8,9 +8,10 @@ FRONTEND_ORIGIN=https://seu-app.vercel.app   # para onde o PayPal devolve o comp
 FRONTEND_ORIGINS=https://seu-app.vercel.app  # origens autorizadas a enviar cookies
 ```
 
-`SESSION_COOKIE_SAMESITE` pode ficar vazio: em HTTPS ele passa a `none`, que é o
-necessário quando o painel está noutro domínio (com `lax` o navegador guarda o cookie
-e nunca o envia, e o dono aparece desligado a cada pedido).
+`SESSION_COOKIE_SAMESITE` pode ficar vazio: em HTTPS ele passa a `none`. Como o
+navegador fala com a API pelo proxy `/api/backend` do próprio app (veja abaixo), o
+cookie de sessão é de primeira parte e `lax` também funciona — mais restrito e
+recomendado se você quiser fixá-lo.
 
 ```bash
 # 1. Backend como serviço
@@ -31,8 +32,26 @@ sudo certbot --nginx -d payagent.eliobrostech.site
 curl https://payagent.eliobrostech.site/health
 ```
 
-Depois: na Vercel defina `NEXT_PUBLIC_API_URL=https://payagent.eliobrostech.site`,
-atualize o webhook no painel do PayPal para
+Depois, na Vercel, defina a variável **de build** que o proxy usa:
+
+```bash
+NEXT_PUBLIC_API_URL=https://payagent.eliobrostech.site
+# API_ORIGIN também funciona e tem prioridade se as duas existirem
+```
+
+## O proxy `/api/backend`
+
+O navegador não chama a API diretamente: as páginas pedem `/api/backend/...` no
+próprio domínio do app e o servidor do Next.js repassa para `NEXT_PUBLIC_API_URL`
+(ou `API_ORIGIN`), conforme `frontend/next.config.js`. Isso mantém o cookie de sessão
+do painel como cookie de primeira parte — cookie de outro site é descartado pelo
+navegador, e o dono volta ao login logo depois de entrar.
+
+A variável é lida no *build*: mudou o valor, precisa de um novo deploy na Vercel,
+senão `/api/backend` continua apontando para a API antiga (ou para
+`http://localhost:8000` quando nenhuma das duas está definida).
+
+Também: atualize o webhook no painel do PayPal para
 `https://payagent.eliobrostech.site/webhooks/paypal` (e `PAYPAL_WEBHOOK_ID` no `.env`),
 e use `https://SEU-APP.vercel.app/widget.js` nas lojas — o widget é servido pela
 aplicação que tem o `/embed`, não pela API.
@@ -41,6 +60,8 @@ Conferência rápida:
 
 ```bash
 curl -i https://payagent.eliobrostech.site/health
-# e, com uma origem diferente da configurada, deve responder 403
+# o mesmo health através do proxy do app: deve responder {"ok":true}
+curl -i https://SEU-APP.vercel.app/api/backend/health
+# e, com uma origem diferente da configurada, a API deve responder 403
 curl -i -H "Origin: https://evil.example" https://payagent.eliobrostech.site/health
 ```
